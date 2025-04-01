@@ -1,52 +1,87 @@
+/* :root defines CSS variables for the color scheme */
+:root {
+    --background: #09090b; /* Very dark gray, near black */
+    --foreground: #fafafa; /* Near white for primary text */
+    --muted: #18181b; /* Slightly lighter dark gray for cards/containers */
+    --muted-foreground: #a1a1aa; /* Gray for secondary/placeholder text */
+    --popover: #09090b;
+    --popover-foreground: #fafafa;
+    --card: #18181b;
+    --card-foreground: #fafafa;
+    --border: #27272a; /* Dark gray for borders */
+    --input: #27272a; /* Input background */
+    --primary: #60a5fa; /* Primary accent color (e.g., blue) */
+    --primary-foreground: #09090b; /* Text on primary elements */
+    --secondary: #3f3f46; /* Secondary accent/background */
+    --secondary-foreground: #fafafa;
+    --accent: #3f3f46;
+    --accent-foreground: #fafafa;
+    --destructive: #f43f5e; /* Destructive action color (e.g., red/pink) */
+    --destructive-foreground: #fafafa;
+    --ring: #60a5fa; /* Focus ring color */
+    --radius: 0.5rem; /* Default border radius */
+}
+
 /* General Styles */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     line-height: 1.6;
     margin: 0;
     padding: 20px;
-    background-color: #f8f9fa;
-    color: #333;
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .container {
     max-width: 1000px;
     margin: 20px auto;
-    background: #fff;
+    background: var(--muted);
     padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Subtle shadow can still work */
 }
 
 h1, h2 {
-    color: #0056b3; /* Primary blue */
+    color: var(--foreground);
     margin-bottom: 1em;
-    border-bottom: 2px solid #e9ecef;
-    padding-bottom: 0.5em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.6em;
+    font-weight: 600;
 }
 
 h1 {
     text-align: center;
     font-size: 2.2em;
-    color: #004085; /* Darker blue */
+    border-bottom-width: 2px;
 }
+
+h2 {
+    font-size: 1.5em;
+    margin-top: 2em;
+}
+
 
 p {
     margin-bottom: 1em;
-    color: #555;
+    color: var(--muted-foreground);
 }
 
 code {
-    background-color: #e2e6ea;
+    background-color: var(--accent);
+    color: var(--accent-foreground);
     padding: 3px 6px;
-    border-radius: 4px;
+    border-radius: calc(var(--radius) - 4px);
     font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
-    font-size: 0.95em;
+    font-size: 0.9em;
 }
 
 hr.separator {
     border: 0;
     height: 1px;
-    background: #dee2e6;
+    background: var(--border);
     margin: 30px 0;
 }
 
@@ -55,83 +90,150 @@ hr.separator {
     margin-bottom: 30px;
 }
 
-/* Buttons */
+/* --- Input Elements (Text Inputs, Textarea) --- */
+input[type="text"],
+textarea,
+.table-name,
+.new-column-input,
+.fd-determinant,
+.fd-dependent {
+    background-color: var(--input);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-size: 0.95em;
+    width: 100%; /* Ensure inputs take available space */
+    box-sizing: border-box; /* Include padding and border in width */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="text"]::placeholder,
+textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 0.7;
+}
+
+input[type="text"]:focus-visible,
+textarea:focus-visible,
+.table-name:focus-visible,
+.new-column-input:focus-visible,
+.fd-determinant:focus-visible,
+.fd-dependent:focus-visible {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.5); /* Simulate focus ring */
+}
+
+
+/* --- Buttons --- */
 button {
     padding: 8px 15px;
     border: none;
-    border-radius: 5px;
+    border-radius: var(--radius);
     cursor: pointer;
     font-size: 0.95em;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-    margin-left: 5px; /* General spacing for buttons */
+    font-weight: 500;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+    margin-left: 5px;
+    display: inline-flex; /* Align icon/text nicely if needed */
+    align-items: center;
+    justify-content: center;
 }
 
-button:active {
-    transform: scale(0.98);
+button:focus-visible {
+     outline: none;
+     box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring); /* Clearer focus ring */
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .add-button {
-    background-color: #28a745; /* Green */
-    color: white;
+    background-color: var(--secondary); /* Use secondary for less emphasis */
+    color: var(--secondary-foreground);
     margin-top: 10px;
 }
-
-.add-button:hover {
-    background-color: #218838;
+.add-button:hover:not(:disabled) {
+    background-color: #4b5563; /* Slightly lighter secondary */
 }
 
-.action-button {
-    background-color: #007bff; /* Blue */
-    color: white;
+.action-button { /* Primary action button */
+    background-color: var(--primary);
+    color: var(--primary-foreground);
     padding: 12px 25px;
     font-size: 1.1em;
     display: block;
     width: 100%;
     margin-top: 20px;
 }
-
-.action-button:hover {
-    background-color: #0056b3;
+.action-button:hover:not(:disabled) {
+     background-color: #3b82f6; /* Slightly darker/saturated primary */
 }
 
-.remove-button { /* Base style for remove buttons */
-    background-color: #dc3545; /* Red */
-    color: white;
+
+/* Specific buttons */
+.add-column-btn {
+    background-color: var(--secondary);
+    color: var(--secondary-foreground);
+    padding: 8px 10px;
+    flex-shrink: 0;
+}
+.add-column-btn:hover:not(:disabled) {
+     background-color: #4b5563;
+}
+
+/* Remove Buttons (Destructive Action) */
+.remove-button, /* Base style if used */
+.remove-column-btn,
+.remove-table-btn,
+.remove-fd-btn {
+    background-color: transparent; /* Often transparent background */
+    color: var(--muted-foreground); /* Muted color by default */
     font-weight: bold;
-    padding: 2px 8px;
+    border: none;
+    width: 22px;
+    height: 22px;
     line-height: 1;
-    font-size: 1em; /* Make 'x' slightly larger */
-    border-radius: 50%; /* Make it round */
-    width: 24px;
-    height: 24px;
+    padding: 0;
+    border-radius: 50%; /* Keep it round */
+    font-size: 16px; /* Adjust size */
+    cursor: pointer;
     display: inline-flex;
     justify-content: center;
     align-items: center;
+    flex-shrink: 0;
+    margin-left: 8px;
+    transition: color 0.2s ease, background-color 0.2s ease;
 }
-
-.remove-button:hover {
-    background-color: #c82333;
+.remove-button:hover,
+.remove-column-btn:hover,
+.remove-table-btn:hover,
+.remove-fd-btn:hover {
+    background-color: var(--destructive);
+    color: var(--destructive-foreground); /* Make text light on red hover */
 }
 
 
 /* Table Definition Styles */
 #tables-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Responsive grid */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 20px;
     margin-bottom: 20px;
 }
 
 .table-definition {
-    border: 1px solid #ced4da;
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 15px;
-    background-color: #f8f9fa;
-    transition: box-shadow 0.2s ease;
+    background-color: var(--card); /* Use card background */
+    transition: border-color 0.2s ease;
 }
-
 .table-definition:hover {
-     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+     border-color: var(--secondary); /* Highlight border on hover */
 }
 
 .table-header {
@@ -140,21 +242,28 @@ button:active {
     align-items: center;
     margin-bottom: 15px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid var(--border);
 }
 
 .table-name {
     flex-grow: 1;
     margin-right: 10px;
-    font-weight: bold;
-    border: 1px solid #ced4da;
-    padding: 5px 8px;
-    border-radius: 4px;
+    font-weight: 500; /* Slightly less bold */
+    background: transparent; /* Match card background */
+    border: none; /* Remove border */
+    padding: 5px 0px; /* Adjust padding */
+    color: var(--card-foreground);
 }
+.table-name:focus-visible {
+     box-shadow: none; /* Remove default focus */
+     border-bottom: 1px solid var(--ring); /* Underline on focus */
+     border-radius: 0; /* Remove radius for underline */
+}
+
 
 .columns-container {
     margin-bottom: 15px;
-    min-height: 30px; /* Ensure space even when empty */
+    min-height: 30px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -164,38 +273,17 @@ button:active {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: #fff;
+    background-color: var(--muted); /* Slightly different background */
     padding: 8px 12px;
-    border-radius: 4px;
-    border: 1px solid #e0e0e0;
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid var(--border);
 }
 
 .column-name {
     font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
-    font-size: 1em;
-    word-break: break-all; /* Prevent long names overflowing */
-}
-
-.remove-column-btn, .remove-table-btn, .remove-fd-btn {
-    background-color: #dc3545;
-    color: white;
-    font-weight: bold;
-    border: none;
-    width: 20px;
-    height: 20px;
-    line-height: 1;
-    padding: 0;
-    border-radius: 50%;
-    font-size: 14px;
-    cursor: pointer;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    flex-shrink: 0; /* Prevent shrinking */
-    margin-left: 8px;
-}
-.remove-column-btn:hover, .remove-table-btn:hover, .remove-fd-btn:hover {
-    background-color: #c82333;
+    font-size: 0.95em;
+    word-break: break-all;
+    color: var(--foreground);
 }
 
 .add-column-controls {
@@ -206,19 +294,6 @@ button:active {
 
 .new-column-input {
     flex-grow: 1;
-    padding: 8px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-}
-
-.add-column-btn {
-    background-color: #6c757d; /* Secondary grey */
-    color: white;
-    padding: 8px 10px;
-    flex-shrink: 0;
-}
-.add-column-btn:hover {
-    background-color: #5a6268;
 }
 
 
@@ -235,96 +310,110 @@ button:active {
     align-items: center;
     gap: 8px;
     padding: 10px;
-    background-color: #e9ecef;
-    border-radius: 5px;
-    border: 1px solid #d6dce1;
+    background-color: var(--input); /* Use input background for consistency */
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
 }
 
 .fd-determinant, .fd-dependent {
     flex-grow: 1;
-    padding: 8px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
     font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    /* Inherit styles from general input */
 }
 
 .fd-arrow {
     font-weight: bold;
     font-size: 1.2em;
-    color: #0056b3;
+    color: var(--primary); /* Use primary color for arrow */
     flex-shrink: 0;
 }
 
 .add-fd-controls {
-    text-align: left; /* Align button to the left */
+    text-align: left;
 }
+
 
 /* Output Section */
 .output-section {
     margin-top: 40px;
     padding-top: 20px;
-    border-top: 2px solid #e9ecef;
+    border-top: 1px solid var(--border);
 }
 
 #results {
-    background-color: #f8f9fa;
+    background-color: var(--background); /* Match body background or slightly different */
     padding: 20px;
-    border-radius: 8px;
+    border-radius: var(--radius);
     font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
-    white-space: pre-wrap; /* Wrap long lines */
-    word-wrap: break-word; /* Break long words/attributes */
-    border: 1px solid #d6dce1;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 1px solid var(--border);
     min-height: 100px;
-    max-height: 60vh; /* Limit height and allow scrolling */
-    overflow-y: auto; /* Add scrollbar if content overflows */
-    line-height: 1.5; /* Adjust monospace line height */
+    max-height: 60vh;
+    overflow-y: auto;
+    line-height: 1.6; /* Monospace often needs more line height */
+    color: var(--muted-foreground); /* Default text in results */
 }
 
-#results h2 { /* Style h2 within results differently */
-    color: #17a2b8; /* Info blue/cyan */
+#results h2 { /* Style h2 within results */
+    color: var(--primary);
     font-size: 1.3em;
-    border-bottom: 1px solid #adb5bd;
+    border-bottom: 1px solid var(--secondary);
     margin-top: 1.5em;
+    font-weight: 500;
 }
 #results h2:first-child {
     margin-top: 0;
 }
 
+#results code { /* Style code blocks within results */
+    color: var(--foreground); /* Make code stand out */
+    background-color: var(--input); /* Use input background */
+    padding: 2px 5px;
+    border-radius: calc(var(--radius) - 4px);
+}
 
+/* Status/Messaging Styles */
 .error {
-    color: #dc3545; /* Red */
-    font-weight: bold;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    padding: 10px;
-    border-radius: 4px;
-    margin-bottom: 10px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Use normal font for errors */
-    white-space: normal; /* Allow wrapping */
+    color: var(--destructive-foreground);
+    font-weight: 500;
+    background-color: var(--destructive);
+    border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
+    padding: 10px 15px;
+    border-radius: var(--radius);
+    margin-bottom: 15px;
+    font-family: inherit; /* Use body font */
+    white-space: normal;
 }
 
 .success {
-     color: #28a745; /* Green */
-     font-weight: bold;
+     color: #4ade80; /* Bright green for success */
+     font-weight: 500;
 }
 
 .relation-title {
-    font-weight: bold;
-    margin-top: 1em;
+    font-weight: 500;
+    margin-top: 1.5em;
     margin-bottom: 0.5em;
-    color: #6f42c1; /* Purple */
+    color: var(--foreground); /* Use foreground for titles */
     font-size: 1.1em;
 }
 
 .step-explanation {
-    font-style: italic;
-    color: #5a6268; /* Grey */
+    font-style: normal; /* Remove italics */
+    color: var(--muted-foreground);
     margin-bottom: 1em;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Use normal font */
-    white-space: normal; /* Allow wrapping for explanations */
-    background-color: #e9ecef;
-    padding: 10px;
-    border-radius: 5px;
+    font-family: inherit; /* Use body font */
+    white-space: normal;
+    background-color: var(--card); /* Background for emphasis */
+    padding: 15px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    font-size: 0.95em;
+}
+.step-explanation code { /* Code within explanations */
+     background-color: var(--accent);
+     color: var(--accent-foreground);
 }
 
 /* Hide templates */
