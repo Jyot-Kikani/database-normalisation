@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Database Normalization Tool</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Database Normalization Steps</h1>
+
+        <div class="input-section">
+            <h2>1. Define Schema (Tables and Columns)</h2>
+            <div id="tables-container">
+                <!-- Table definitions will be added here by JS -->
+            </div>
+            <button id="add-table-btn" class="add-button">Add Table</button>
+
+            <hr class="separator">
+
+            <h2>2. Define Functional Dependencies (FDs)</h2>
+            <p>Define the functional dependencies that hold across *all* attributes defined above. Enter attributes exactly as named in the tables.</p>
+            <div id="fds-list">
+                <!-- FD entries will be added here by JS -->
+            </div>
+             <div class="add-fd-controls">
+                 <button id="add-fd-btn" class="add-button">Add FD</button>
+             </div>
+
+
+            <hr class="separator">
+
+            <button id="normalize-btn" class="action-button">Normalize Schema</button>
+        </div>
+
+        <div class="output-section" id="output-section">
+            <h2>Normalization Steps & Results</h2>
+            <div id="results">
+                <p>Define your schema and FDs above, then click "Normalize Schema".</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates (hidden, used by JS to clone new elements) -->
+    <template id="table-template">
+        <div class="table-definition">
+            <div class="table-header">
+                <input type="text" class="table-name" placeholder="Table Name (Optional)">
+                <button class="remove-table-btn" title="Remove this table">×</button>
+            </div>
+            <div class="columns-container">
+                <!-- Column entries will be added here -->
+            </div>
+            <div class="add-column-controls">
+                <input type="text" class="new-column-input" placeholder="New Attribute Name">
+                <button class="add-column-btn">Add Column</button>
+            </div>
+        </div>
+    </template>
+
+    <template id="column-template">
+        <div class="column-entry">
+            <span class="column-name">AttributeName</span>
+            <button class="remove-column-btn" title="Remove column">×</button>
+        </div>
+    </template>
+
+    <template id="fd-template">
+         <div class="fd-entry">
+            <input type="text" class="fd-determinant" placeholder="A, B">
+            <span class="fd-arrow">→</span>
+            <input type="text" class="fd-dependent" placeholder="C, D">
+            <button class="remove-fd-btn" title="Remove FD">×</button>
+         </div>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>
