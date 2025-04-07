@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Elements --- (Same as before)
+    // --- DOM Elements ---
     const tablesContainer = document.getElementById('tables-container');
     const addTableBtn = document.getElementById('add-table-btn');
     const fdsListContainer = document.getElementById('fds-list');
@@ -7,12 +7,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalizeBtn = document.getElementById('normalize-btn');
     const resultsDiv = document.getElementById('results');
 
-    // --- Templates --- (Same as before)
+    // --- Templates ---
     const tableTemplate = document.getElementById('table-template');
     const columnTemplate = document.getElementById('column-template');
     const fdTemplate = document.getElementById('fd-template');
 
-    // --- Utility Functions (Set operations, formatting - same as before) ---
+    // --- Utility Functions (Set operations, formatting) ---
     const setUnion = (setA, setB) => new Set([...setA, ...setB]);
     const setIntersection = (setA, setB) => new Set([...setA].filter(x => setB.has(x)));
     const setDifference = (setA, setB) => new Set([...setA].filter(x => !setB.has(x)));
@@ -21,16 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const setsAreEqual = (setA, setB) => setA.size === setB.size && setIsSubset(setA, setB);
     const formatSet = (s) => `{${[...s].sort().join(', ')}}`;
 
-    // --- Core Logic Functions (Parsing, Closure - same as before) ---
+    // --- Core Logic Functions (Parsing, Closure) ---
 
-    function parseAttributes(str) { // Same as before
+    function parseAttributes(str) {
         if (!str) return new Set();
         return new Set(str.split(',')
                           .map(a => a.trim())
                           .filter(a => a !== ''));
     }
 
-    function parseFDsFromUI() { // Same logic as before
+    function parseFDsFromUI() {
         const fds = [];
         const fdEntries = fdsListContainer.querySelectorAll('.fd-entry');
         let entryIndex = 0;
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return { fds, error: null };
     }
 
-    function attributeClosure(initialAttributes, fds, allAttributesInRelation = null) { // Same as before
+    function attributeClosure(initialAttributes, fds, allAttributesInRelation = null) {
         let closure = new Set(initialAttributes);
         let changed = true;
         const relevantAttributes = allAttributesInRelation ? new Set(allAttributesInRelation) : null; // Use a copy
@@ -97,13 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return closure;
     }
 
-    function isSuperkey(keyAttributes, relationAttributes, fds) { // Same as before
+    function isSuperkey(keyAttributes, relationAttributes, fds) {
          if (!keyAttributes || keyAttributes.size === 0 || !relationAttributes || relationAttributes.size === 0) return false;
          const closure = attributeClosure(keyAttributes, fds, relationAttributes);
          return setsAreEqual(closure, relationAttributes);
      }
 
-    // --- NEW: Function to Find All Candidate Keys ---
+    // --- Function to Find All Candidate Keys ---
 
     /**
      * Finds all candidate keys for a relation.
@@ -249,14 +249,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- MODIFIED Normalization Steps ---
+    // --- Normalization Steps ---
 
     function normalize(allAttributes, fds) {
         let output = "";
         let currentRelations = [{ name: "U", attributes: new Set(allAttributes) }]; // Start with Universal Relation
 
         if (allAttributes.size === 0) return "<p class='error'>No attributes defined.</p>";
-        if (fds.length === 0) { /* ... (same handling as before) ... */
+        if (fds.length === 0) { // No functional dependencies provided
              output += `<p class='relation-title'>Initial Relation: U(${formatSet(allAttributes)})</p>\n`;
              output += "<p>No functional dependencies provided.</p>";
              output += "<p class='step-explanation'>Without FDs, we cannot determine keys or dependencies. The relation is trivially in BCNF, assuming it meets 1NF (atomic attributes).</p>";
@@ -271,13 +271,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         output += "\n---\n";
 
-        // --- 1NF --- (Same as before)
+        // --- 1NF ---
         output += "<h2>Step 1: First Normal Form (1NF)</h2>\n";
         output += "<p class='step-explanation'>Ensures atomic attributes and no repeating groups. We assume your input represents atomic attributes.</p>";
         output += `<p class='success'>Relation U(${formatSet(allAttributes)}) is assumed to be in 1NF.</p>\n\n`;
         output += "---\n";
 
-        // --- 2NF (Modified Logic) ---
+        // --- 2NF ---
         output += "<h2>Step 2: Second Normal Form (2NF)</h2>\n";
         output += "<p class='step-explanation'>Requires 1NF and no partial dependencies. A non-prime attribute cannot depend on only a proper subset of *any* candidate key.</p>";
 
@@ -296,7 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
 
-            // **MODIFICATION: Find ALL candidate keys**
             const candidateKeys = findAllCandidateKeys(currentRel.attributes, fds);
 
             if (candidateKeys.length === 0) {
@@ -307,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             output += `<p>Found Candidate Keys: ${candidateKeys.map(ck => `<code>${formatSet(ck)}</code>`).join(', ')}</p>`;
 
-            // **MODIFICATION: Determine ALL prime attributes**
             const allPrimeAttributes = new Set();
             candidateKeys.forEach(ck => ck.forEach(attr => allPrimeAttributes.add(attr)));
             output += `<p>All Prime Attributes: ${formatSet(allPrimeAttributes)}</p>`;
@@ -340,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  relevantNonPrimeDependents = setIntersection(relevantNonPrimeDependents, currentRel.attributes);
 
                  if (relevantNonPrimeDependents.size > 0 && setIsSubset(determinant, currentRel.attributes)) {
-                     // Check if determinant is a proper subset of *ANY* candidate key
+                     // Check if determinant is a proper subset of ANY* candidate key
                      for (const ck of candidateKeys) {
                          if (setIsProperSubset(determinant, ck)) {
                              output += `<p>Potential Partial Dependency: <code>${formatSet(determinant)} → ${formatSet(relevantNonPrimeDependents)}</code> (Determinant is proper subset of CK <code>${formatSet(ck)}</code>, dependent is non-prime).</p>`;
@@ -353,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          }
                      }
                  }
-            } // End FD loop
+            }
 
 
             if (decomposedIn2NF) { // Use the flag set inside the loop
@@ -408,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  output += `<p class='success'>No partial dependencies found. Relation ${currentRel.name} is already in 2NF.</p>`;
                  relations2NF.push(currentRel); // Keep the original relation
              }
-        } // End while relationsToProcess2NF
+        }
 
         if (!decomposedIn2NF) {
             output += `<p class='success'>All relations were already in 2NF.</p>\n`;
@@ -422,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
         output += "\n---\n";
 
 
-        // --- 3NF (Modified Logic) ---
+        // --- 3NF ---
         output += "<h2>Step 3: Third Normal Form (3NF)</h2>\n";
         output += "<p class='step-explanation'>Requires 2NF and no transitive dependencies. An FD X → A violates 3NF if X is not a superkey and A is not a prime attribute (i.e., A is not part of *any* candidate key).</p>";
 
@@ -442,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  continue;
              }
 
-            // **MODIFICATION: Find ALL candidate keys for this relation**
+            //nFind ALL candidate keys for this relation
             const candidateKeys = findAllCandidateKeys(currentRel.attributes, fds);
 
             if (candidateKeys.length === 0) {
@@ -452,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             output += `<p>Found Candidate Keys: ${candidateKeys.map(ck => `<code>${formatSet(ck)}</code>`).join(', ')}</p>`;
 
-            // **MODIFICATION: Determine ALL prime attributes**
+            // Determine ALL prime attributes
             const allPrimeAttributes = new Set();
             candidateKeys.forEach(ck => ck.forEach(attr => allPrimeAttributes.add(attr)));
             output += `<p>All Prime Attributes: ${formatSet(allPrimeAttributes)}</p>`;
@@ -480,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (!determinant.has(attrA)) { // Ensure non-trivial part
                                 const singletonA = new Set([attrA]);
 
-                                // **MODIFIED Check:**
+                                // Check:
                                 // 1. X is NOT a superkey of the relation
                                 const isXSuperkey = isSuperkey(determinant, currentRel.attributes, fds);
                                 // 2. A is NOT a prime attribute (using allPrimeAttributes)
@@ -497,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
-            } // End FD check loop
+            }
 
 
             if (decomposedIn3NF) { // Use flag
@@ -553,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 output += `<p class='success'>No transitive dependencies found. Relation ${currentRel.name} is already in 3NF.</p>`;
                 relations3NF.push(currentRel); // Keep the original
             }
-        } // End while relationsToProcess3NF
+        }
 
 
         if (!decomposedIn3NF) {
@@ -568,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
         output += "\n---\n";
 
 
-        // --- BCNF (Logic mostly unchanged, relies on isSuperkey) ---
+        // --- BCNF ---
         output += "<h2>Step 4: Boyce-Codd Normal Form (BCNF)</h2>\n";
         output += "<p class='step-explanation'>Requires 3NF. For every non-trivial FD X → Y that holds, X must be a superkey. Decomposition might lose dependencies.</p>";
 
@@ -605,7 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          }
                      }
                  }
-             } // End loop checking FDs
+             }
 
              if (violationFound) {
                  output += `<p class='success'>Decomposing ${currentRel.name} based on the violation:</p>`;
@@ -629,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   output += `<p class='success'>No BCNF violations found. Relation ${currentRel.name} is in BCNF.</p>`;
                   relationsBCNF_final.push(currentRel);
              }
-        } // End while processingQueue
+        }
 
         if (!decompositionOccurredBCNF) {
             output += `<p class='success'>All relations were already in BCNF.</p>\n`;
@@ -644,10 +642,10 @@ document.addEventListener('DOMContentLoaded', () => {
         output += "\n---\n";
 
         return output;
-    } // End of normalize function
+    }
 
 
-    // --- UI Interaction Functions --- (addTable, addColumn, addFdRow - Same as before)
+    // UI Interaction Functions (addTable, addColumn, addFdRow)
     function addTable() {
         const tableClone = tableTemplate.content.cloneNode(true);
         tablesContainer.appendChild(tableClone);
@@ -681,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
      }
 
 
-    // --- Event Listeners --- (Same as before)
+    // --- Event Listeners ---
     addTableBtn.addEventListener('click', addTable);
     addFdBtn.addEventListener('click', addFdRow);
     tablesContainer.addEventListener('click', (event) => {
@@ -702,11 +700,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Normalize Button Handler --- (Same basic flow, uses updated normalize)
+    // --- Normalize Button Handler --- 
     normalizeBtn.addEventListener('click', () => {
         resultsDiv.innerHTML = "<p>Processing...</p>";
 
-        // 1. Collect Attributes (Same as before)
+        // 1. Collect Attributes
         const allAttributes = new Set();
         const columnSpans = tablesContainer.querySelectorAll('.column-name');
         if (columnSpans.length === 0) {
@@ -722,13 +720,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 2. Parse FDs (Same as before)
+        // 2. Parse FDs 
         const { fds, error: fdError } = parseFDsFromUI();
         if (fdError) {
             resultsDiv.innerHTML = `<p class='error'>FD Error: ${fdError}</p>`; return;
         }
 
-        // 3. Check FD Attributes Exist (Same as before)
+        // 3. Check FD Attributes Exist 
          let unknownAttrs = new Set();
          fds.forEach(fd => {
              fd.determinant.forEach(attr => { if (!allAttributes.has(attr)) unknownAttrs.add(attr); });
@@ -739,7 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
              return;
          }
 
-        // 4. Perform Normalization (Calls updated `normalize`)
+        // 4. Perform Normalization
         try {
             setTimeout(() => { // Small delay for UI update
                 const normalizationOutput = normalize(allAttributes, fds);
@@ -751,8 +749,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Initial State --- (Same as before)
+    // --- Initial State --- 
     addTable();
     addFdRow();
 
-}); // End DOMContentLoaded
+});
