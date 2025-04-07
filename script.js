@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Elements ---
+    // --- DOM Elements --- (Same as before)
     const tablesContainer = document.getElementById('tables-container');
     const addTableBtn = document.getElementById('add-table-btn');
     const fdsListContainer = document.getElementById('fds-list');
@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalizeBtn = document.getElementById('normalize-btn');
     const resultsDiv = document.getElementById('results');
 
-    // --- Templates ---
+    // --- Templates --- (Same as before)
     const tableTemplate = document.getElementById('table-template');
     const columnTemplate = document.getElementById('column-template');
     const fdTemplate = document.getElementById('fd-template');
@@ -21,25 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const setsAreEqual = (setA, setB) => setA.size === setB.size && setIsSubset(setA, setB);
     const formatSet = (s) => `{${[...s].sort().join(', ')}}`;
 
-    // --- Core Logic Functions (Parsing, Closure, Keys, Normalization - largely same as before) ---
+    // --- Core Logic Functions (Parsing, Closure - same as before) ---
 
-    /**
-     * Parses a comma-separated string of attributes into a Set. Handles potential extra spaces.
-     * @param {string} str - The input string.
-     * @returns {Set<string>} - A set of attributes.
-     */
-    function parseAttributes(str) {
+    function parseAttributes(str) { // Same as before
         if (!str) return new Set();
         return new Set(str.split(',')
-                          .map(a => a.trim()) // Trim whitespace
-                          .filter(a => a !== '')); // Remove empty strings
+                          .map(a => a.trim())
+                          .filter(a => a !== ''));
     }
 
-    /**
-     * Parses functional dependencies from the structured input fields.
-     * @returns {{fds: Array<{determinant: Set<string>, dependent: Set<string>}>, error: string|null}}
-     */
-    function parseFDsFromUI() {
+    function parseFDsFromUI() { // Same logic as before
         const fds = [];
         const fdEntries = fdsListContainer.querySelectorAll('.fd-entry');
         let entryIndex = 0;
@@ -47,126 +38,231 @@ document.addEventListener('DOMContentLoaded', () => {
             entryIndex++;
             const determinantInput = entry.querySelector('.fd-determinant');
             const dependentInput = entry.querySelector('.fd-dependent');
-
             const determinantStr = determinantInput.value.trim();
             const dependentStr = dependentInput.value.trim();
 
-            if (!determinantStr && !dependentStr) continue; // Skip empty entries silently
-
-            if (!determinantStr) {
-                return { fds: [], error: `FD #${entryIndex}: Determinant (left side) cannot be empty.` };
-            }
-             if (!dependentStr) {
-                return { fds: [], error: `FD #${entryIndex}: Dependent (right side) cannot be empty.` };
-            }
+            if (!determinantStr && !dependentStr) continue;
+            if (!determinantStr) return { fds: [], error: `FD #${entryIndex}: Determinant (left side) cannot be empty.` };
+            if (!dependentStr) return { fds: [], error: `FD #${entryIndex}: Dependent (right side) cannot be empty.` };
 
             const determinant = parseAttributes(determinantStr);
             const dependent = parseAttributes(dependentStr);
 
-             if (determinant.size === 0) {
-                 return { fds: [], error: `FD #${entryIndex}: Could not parse attributes on determinant side.` };
-            }
-             if (dependent.size === 0) {
-                return { fds: [], error: `FD #${entryIndex}: Could not parse attributes on dependent side.` };
-            }
+            if (determinant.size === 0) return { fds: [], error: `FD #${entryIndex}: Could not parse attributes on determinant side.` };
+            if (dependent.size === 0) return { fds: [], error: `FD #${entryIndex}: Could not parse attributes on dependent side.` };
 
-
-            // Handle trivial dependencies (remove attributes from dependent if they are in determinant)
             const common = setIntersection(determinant, dependent);
             let finalDependent = setDifference(dependent, common);
 
-            // Only add the FD if the dependent side is not empty after removing trivial parts
             if (finalDependent.size > 0) {
                  fds.push({ determinant, dependent: finalDependent });
             } else if (dependent.size > 0) {
-                // It was completely trivial, maybe warn user? For now, just skip adding it.
                 console.warn(`FD #${entryIndex} (${determinantStr} -> ${dependentStr}) is trivial and was skipped.`);
             }
         }
         return { fds, error: null };
     }
 
-    // --- Attribute Closure, Find Candidate Key, Is Superkey (Identical to previous version) ---
-        function attributeClosure(initialAttributes, fds, allAttributesInRelation = null) {
+    function attributeClosure(initialAttributes, fds, allAttributesInRelation = null) { // Same as before
         let closure = new Set(initialAttributes);
         let changed = true;
+        const relevantAttributes = allAttributesInRelation ? new Set(allAttributesInRelation) : null; // Use a copy
 
         while (changed) {
             changed = false;
             for (const fd of fds) {
+                // Optimization: check if FD determinant is subset of relation attributes if scope provided
+                if (relevantAttributes && !setIsSubset(fd.determinant, relevantAttributes)) {
+                    continue;
+                }
+
                 if (setIsSubset(fd.determinant, closure)) {
-                    const dependentsToAdd = allAttributesInRelation
-                        ? setIntersection(fd.dependent, allAttributesInRelation)
-                        : fd.dependent;
+                    let dependentsToAdd = fd.dependent;
+                    // Filter dependents if relation scope is provided
+                    if (relevantAttributes) {
+                        dependentsToAdd = setIntersection(dependentsToAdd, relevantAttributes);
+                    }
 
                     const closureSizeBefore = closure.size;
-                    closure = setUnion(closure, dependentsToAdd);
-                    if (closure.size > closureSizeBefore) {
-                        changed = true;
-                    }
+                    // Only add attributes not already in the closure
+                    dependentsToAdd.forEach(dep => {
+                        if (!closure.has(dep)) {
+                            closure.add(dep);
+                            changed = true; // Mark change only if new attribute added
+                        }
+                    });
                 }
             }
         }
         return closure;
     }
 
-    function findCandidateKey(relationAttributes, fds) {
-        if (relationAttributes.size === 0) return null;
-
-        let potentialKey = new Set(relationAttributes);
-
-        // Iteratively remove attributes
-        const attributesToRemove = [...relationAttributes]; // Create array to iterate safely
-        for (const attr of attributesToRemove) {
-            const smallerKey = setDifference(potentialKey, new Set([attr]));
-            if (smallerKey.size === 0) continue; // Don't make key empty
-
-            const closure = attributeClosure(smallerKey, fds, relationAttributes);
-            if (setsAreEqual(closure, relationAttributes)) {
-                potentialKey = smallerKey; // Successfully removed attribute, key is smaller
-            }
-        }
-
-        // Final check if the resulting key works
-        if (setsAreEqual(attributeClosure(potentialKey, fds, relationAttributes), relationAttributes)) {
-            return potentialKey;
-        }
-
-        // Fallback: If FDs don't cover all attributes, the full set might be the only key
-        if(setsAreEqual(attributeClosure(relationAttributes, fds, relationAttributes), relationAttributes)){
-            console.warn("Could not reduce key from all attributes. Returning all attributes as potential key.");
-            return relationAttributes;
-        }
-
-        console.error("Could not determine a candidate key for:", formatSet(relationAttributes));
-        return null; // Indicate failure
-    }
-
-     function isSuperkey(keyAttributes, relationAttributes, fds) {
+    function isSuperkey(keyAttributes, relationAttributes, fds) { // Same as before
          if (!keyAttributes || keyAttributes.size === 0 || !relationAttributes || relationAttributes.size === 0) return false;
          const closure = attributeClosure(keyAttributes, fds, relationAttributes);
          return setsAreEqual(closure, relationAttributes);
      }
 
-    // --- Normalization Steps (1NF, 2NF, 3NF, BCNF - Identical logic to previous version) ---
-    // Important: These functions take `allAttributes` (a Set) and `fds` (Array of {determinant, dependent})
-    // They don't care *how* these were collected from the UI.
-    function normalize(allAttributes, fds) {
-        let output = "";
-        let currentRelations = [{ name: "R_initial", attributes: new Set(allAttributes) }];
+    // --- NEW: Function to Find All Candidate Keys ---
 
-        // Guard against empty input
-        if (allAttributes.size === 0) {
-            return "<p class='error'>No attributes defined. Cannot normalize.</p>";
+    /**
+     * Finds all candidate keys for a relation.
+     * @param {Set<string>} relationAttributes - The attributes of the relation.
+     * @param {Array<{determinant: Set<string>, dependent: Set<string>}>} fds - Functional dependencies.
+     * @returns {Array<Set<string>>} - An array of sets, each representing a candidate key. Returns empty array on error or if none found.
+     */
+     function findAllCandidateKeys(relationAttributes, fds) {
+        if (relationAttributes.size === 0) return [];
+
+        const allAttrs = new Set(relationAttributes);
+        const superkeys = [];
+
+        // Step 1: Check if the set of all attributes is itself a superkey. If not, something is wrong.
+        if (!isSuperkey(allAttrs, allAttrs, fds)) {
+             console.error("Error: The set of all attributes is not a superkey. Check FDs.", formatSet(allAttrs));
+             // It might mean not all attributes are reachable, or FDs are insufficient.
+             // Let's try finding keys anyway, but this is a warning sign.
+             // As a fallback, maybe return [allAttrs] if it *does* determine itself?
+             if (setIsSubset(allAttrs, attributeClosure(allAttrs, fds, allAttrs))) {
+                // It determines itself, proceed with caution
+             } else {
+                 return []; // Cannot proceed reliably
+             }
         }
-         if (fds.length === 0) {
-             output += `<p class='relation-title'>Initial Relation: R_initial(${formatSet(allAttributes)})</p>\n`;
-             output += "<p>No functional dependencies provided.</p>";
-             output += "<p class='step-explanation'>Without FDs, we cannot determine keys or dependencies. The relation is trivially in BCNF, assuming it meets 1NF (atomic attributes).</p>";
-             output += `<p class='success'>Final Relation (assumed BCNF): R_initial(${formatSet(allAttributes)})</p>\n`;
-             return output;
+
+        // Step 2: Iterate through all possible subsets of attributes (potential keys)
+        // This is computationally expensive! (2^n subsets)
+        const attributeList = Array.from(allAttrs);
+        const numAttributes = attributeList.length;
+        let foundSuperkey = false;
+
+        // Optimization: Start checking smaller subsets first
+        for (let k = 1; k <= numAttributes; k++) { // k is the size of the subset
+             // Generate combinations of size k
+             const combinations = getCombinations(attributeList, k);
+
+             for (const combo of combinations) {
+                 const potentialKey = new Set(combo);
+                 if (isSuperkey(potentialKey, allAttrs, fds)) {
+                     superkeys.push(potentialKey);
+                     foundSuperkey = true;
+                     // Optimization: If we find superkeys of size k, we don't *strictly* need
+                     // to check larger sets containing these, but finding all superkeys first
+                     // then minimizing is conceptually simpler here.
+                 }
+             }
+             // If we found superkeys of size k, and we are looking for *minimal* keys,
+             // we could potentially stop searching larger sizes, but finding all CKs might
+             // involve keys of different sizes. Let's find all superkeys first.
+        }
+
+         if (!foundSuperkey && isSuperkey(allAttrs, allAttrs, fds)) {
+             // If no smaller subset worked, the full set is the only superkey/candidate key
+              superkeys.push(allAttrs);
+         } else if (!foundSuperkey) {
+             console.error("Failed to find any superkey, including the full set of attributes for:", formatSet(allAttrs));
+             return []; // Should not happen if initial check passed, but safety.
          }
 
+
+        // Step 3: Minimize the list of superkeys to find candidate keys
+        const candidateKeys = [];
+        superkeys.sort((a, b) => a.size - b.size); // Sort by size for easier comparison
+
+        for (const sk of superkeys) {
+            let isMinimal = true;
+            // Check if any already confirmed candidate key is a proper subset of this superkey
+            for (const ck of candidateKeys) {
+                if (setIsProperSubset(ck, sk)) {
+                    isMinimal = false;
+                    break;
+                }
+            }
+            if (isMinimal) {
+                 // Also check if sk is a proper subset of any *other* superkey found so far
+                 // (This handles cases where we found {A,B} and {A,B,C} as superkeys simultaneously)
+                 let isSublistOfOtherSK = false;
+                 for(const otherSk of superkeys){
+                     if (sk !== otherSk && setIsProperSubset(sk, otherSk)) {
+                         // We found a smaller key already ({A,B}) so {A,B,C} isn't minimal if {A,B} works
+                         // Wait, this logic is reversed. We want to ensure sk is not a superset of an existing ck.
+                         // The first loop already does this.
+                     }
+                 }
+
+                // Final check: ensure no *other* identified minimal key is a subset.
+                // The check against 'candidateKeys' already covers this.
+                candidateKeys.push(sk);
+            }
+        }
+
+        // Ensure candidateKeys only contains unique sets
+        const uniqueCandidateKeys = [];
+        const seenKeys = new Set();
+        for (const ck of candidateKeys) {
+            const keyString = [...ck].sort().join(',');
+            if (!seenKeys.has(keyString)) {
+                uniqueCandidateKeys.push(ck);
+                seenKeys.add(keyString);
+            }
+        }
+
+
+        return uniqueCandidateKeys;
+    }
+
+    /**
+    * Helper to generate combinations of k elements from a set/array.
+    * @param {Array<string>} elements - The pool of elements.
+    * @param {number} k - The size of combinations to generate.
+    * @returns {Array<Array<string>>} - An array of combinations.
+    */
+    function getCombinations(elements, k) {
+        if (k < 0 || k > elements.length) {
+            return [];
+        }
+        if (k === 0) {
+            return [[]];
+        }
+        if (k === elements.length) {
+            return [elements.slice()];
+        }
+        if (k === 1) {
+            return elements.map(e => [e]);
+        }
+
+        const combinations = [];
+        const firstElement = elements[0];
+        const rest = elements.slice(1);
+
+        // Combinations that include the first element
+        const combsWithFirst = getCombinations(rest, k - 1);
+        combsWithFirst.forEach(comb => {
+            combinations.push([firstElement, ...comb]);
+        });
+
+        // Combinations that don't include the first element
+        const combsWithoutFirst = getCombinations(rest, k);
+        combinations.push(...combsWithoutFirst);
+
+        return combinations;
+    }
+
+
+    // --- MODIFIED Normalization Steps ---
+
+    function normalize(allAttributes, fds) {
+        let output = "";
+        let currentRelations = [{ name: "U", attributes: new Set(allAttributes) }]; // Start with Universal Relation
+
+        if (allAttributes.size === 0) return "<p class='error'>No attributes defined.</p>";
+        if (fds.length === 0) { /* ... (same handling as before) ... */
+             output += `<p class='relation-title'>Initial Relation: U(${formatSet(allAttributes)})</p>\n`;
+             output += "<p>No functional dependencies provided.</p>";
+             output += "<p class='step-explanation'>Without FDs, we cannot determine keys or dependencies. The relation is trivially in BCNF, assuming it meets 1NF (atomic attributes).</p>";
+             output += `<p class='success'>Final Relation (assumed BCNF): U(${formatSet(allAttributes)})</p>\n`;
+             return output;
+         }
 
         output += `<p class='relation-title'>Initial Universal Relation: U(${formatSet(allAttributes)})</p>\n`;
         output += `Functional Dependencies (F):\n`;
@@ -175,16 +271,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         output += "\n---\n";
 
-        // --- 1NF ---
+        // --- 1NF --- (Same as before)
         output += "<h2>Step 1: First Normal Form (1NF)</h2>\n";
         output += "<p class='step-explanation'>Ensures atomic attributes and no repeating groups. We assume your input represents atomic attributes.</p>";
         output += `<p class='success'>Relation U(${formatSet(allAttributes)}) is assumed to be in 1NF.</p>\n\n`;
         output += "---\n";
 
-
-        // --- 2NF ---
+        // --- 2NF (Modified Logic) ---
         output += "<h2>Step 2: Second Normal Form (2NF)</h2>\n";
-        output += "<p class='step-explanation'>Requires 1NF and no partial dependencies (non-prime attributes depending on only part of a candidate key). Uses *one* candidate key for analysis.</p>";
+        output += "<p class='step-explanation'>Requires 1NF and no partial dependencies. A non-prime attribute cannot depend on only a proper subset of *any* candidate key.</p>";
 
         let relations2NF = [];
         let decomposedIn2NF = false;
@@ -201,102 +296,110 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
 
-            const candidateKey = findCandidateKey(currentRel.attributes, fds);
-            if (!candidateKey || candidateKey.size === 0) {
-                output += `<p class='error'>Cannot determine Candidate Key for ${currentRel.name}. Skipping 2NF check for this relation.</p>`;
-                relations2NF.push(currentRel); // Keep original
+            // **MODIFICATION: Find ALL candidate keys**
+            const candidateKeys = findAllCandidateKeys(currentRel.attributes, fds);
+
+            if (candidateKeys.length === 0) {
+                output += `<p class='error'>Cannot determine any Candidate Keys for ${currentRel.name}. Skipping 2NF check. Check FDs applicability.</p>`;
+                relations2NF.push(currentRel);
                 continue;
             }
-            output += `<p>Candidate Key found: ${formatSet(candidateKey)}</p>`;
 
-             if (candidateKey.size === 1 || candidateKey.size === currentRel.attributes.size) {
-                 output += `<p class='success'>No partial dependencies possible (key is simple or covers all attributes). Relation is in 2NF.</p>`;
+            output += `<p>Found Candidate Keys: ${candidateKeys.map(ck => `<code>${formatSet(ck)}</code>`).join(', ')}</p>`;
+
+            // **MODIFICATION: Determine ALL prime attributes**
+            const allPrimeAttributes = new Set();
+            candidateKeys.forEach(ck => ck.forEach(attr => allPrimeAttributes.add(attr)));
+            output += `<p>All Prime Attributes: ${formatSet(allPrimeAttributes)}</p>`;
+
+            const nonPrimeAttributes = setDifference(currentRel.attributes, allPrimeAttributes);
+            output += `<p>Non-Prime Attributes: ${formatSet(nonPrimeAttributes)}</p>`;
+
+            if (nonPrimeAttributes.size === 0) {
+                 output += `<p class='success'>No non-prime attributes. Relation is already in 2NF.</p>`;
                  relations2NF.push(currentRel);
                  continue;
             }
-
-            const primeAttributes = new Set(candidateKey);
-            const nonPrimeAttributes = setDifference(currentRel.attributes, primeAttributes);
-             output += `<p>Prime Attributes: ${formatSet(primeAttributes)}</p>`;
-             output += `<p>Non-Prime Attributes: ${formatSet(nonPrimeAttributes)}</p>`;
-             if (nonPrimeAttributes.size === 0) {
-                 output += `<p class='success'>No non-prime attributes. Relation is in 2NF.</p>`;
+             // Check if all attributes are prime (e.g., single CK covers all)
+             if (setsAreEqual(allPrimeAttributes, currentRel.attributes)) {
+                 output += `<p class='success'>All attributes are prime. Relation is already in 2NF.</p>`;
                  relations2NF.push(currentRel);
                  continue;
              }
 
 
-            let partialDependenciesFound = [];
-            let attributesInOriginal = new Set(currentRel.attributes); // Start with all attributes
-            let attributesToRemove = new Set(); // Non-prime attributes that move to new tables
+            let partialDependenciesFound = []; // Stores { determinant: Set, dependent: Set, violatingKey: Set }
+            let attributesInOriginal = new Set(currentRel.attributes);
+            let attributesToRemove = new Set(); // Non-prime attributes that move
 
-
-             // Identify partial dependencies
+            // Check each FD against each Candidate Key
             for (const fd of fds) {
-                const determinant = fd.determinant;
-                 // Check if determinant is a PROPER subset of the candidate key
-                 if (setIsProperSubset(determinant, candidateKey)) {
-                    // Find dependent attributes that are non-prime AND part of this relation
-                    let relevantNonPrimeDependents = setIntersection(fd.dependent, nonPrimeAttributes);
-                    relevantNonPrimeDependents = setIntersection(relevantNonPrimeDependents, currentRel.attributes); // Make sure they exist here
+                 const determinant = fd.determinant;
+                 // Consider only dependents that are non-prime and in this relation
+                 let relevantNonPrimeDependents = setIntersection(fd.dependent, nonPrimeAttributes);
+                 relevantNonPrimeDependents = setIntersection(relevantNonPrimeDependents, currentRel.attributes);
 
-                     if (relevantNonPrimeDependents.size > 0) {
-                         // Check if this determinant is *also* a subset of the current relation's attributes
-                         if(setIsSubset(determinant, currentRel.attributes)) {
-                            output += `<p>Potential Partial Dependency: <code>${formatSet(determinant)} → ${formatSet(relevantNonPrimeDependents)}</code> (Determinant is part of key, dependent is non-prime)</p>`;
-                            partialDependenciesFound.push({ determinant, dependent: relevantNonPrimeDependents });
-                            relevantNonPrimeDependents.forEach(attr => attributesToRemove.add(attr));
-                            decomposedIn2NF = true;
+                 if (relevantNonPrimeDependents.size > 0 && setIsSubset(determinant, currentRel.attributes)) {
+                     // Check if determinant is a proper subset of *ANY* candidate key
+                     for (const ck of candidateKeys) {
+                         if (setIsProperSubset(determinant, ck)) {
+                             output += `<p>Potential Partial Dependency: <code>${formatSet(determinant)} → ${formatSet(relevantNonPrimeDependents)}</code> (Determinant is proper subset of CK <code>${formatSet(ck)}</code>, dependent is non-prime).</p>`;
+                             // Store the violation details - group by determinant later
+                             partialDependenciesFound.push({ determinant: determinant, dependent: relevantNonPrimeDependents, violatingKey: ck });
+                             relevantNonPrimeDependents.forEach(attr => attributesToRemove.add(attr));
+                             decomposedIn2NF = true;
+                             // Found a violation for this FD based on one CK, no need to check other CKs *for this FD*
+                             break;
                          }
                      }
                  }
-             }
+            } // End FD loop
 
-            if (partialDependenciesFound.length > 0) {
+
+            if (decomposedIn2NF) { // Use the flag set inside the loop
                  output += `<p class='success'>Decomposing ${currentRel.name} due to partial dependencies:</p>`;
 
-                // Create new relations for each unique partial dependency determinant
-                const determinantsProcessed = new Set();
-                partialDependenciesFound.forEach(pd => {
-                     const detKey = [...pd.determinant].sort().join(','); // Key for tracking processed determinants
-                     if (!determinantsProcessed.has(detKey)) {
-                        const newTableAttrs = new Set(pd.determinant);
-                        // Collect *all* non-prime dependents for this determinant from all identified partial FDs
-                        partialDependenciesFound.forEach(otherPd => {
-                            if (setsAreEqual(pd.determinant, otherPd.determinant)) {
-                                otherPd.dependent.forEach(dep => newTableAttrs.add(dep));
-                            }
-                        });
+                 // Group violations by determinant to create new tables
+                 const determinantsToTables = new Map(); // Map<string_key, {determinant: Set, dependents: Set}>
+                 partialDependenciesFound.forEach(pd => {
+                     const detKey = [...pd.determinant].sort().join(',');
+                     if (!determinantsToTables.has(detKey)) {
+                         determinantsToTables.set(detKey, { determinant: pd.determinant, dependents: new Set() });
+                     }
+                     pd.dependent.forEach(dep => determinantsToTables.get(detKey).dependents.add(dep));
+                 });
 
-                        const newTableName = `R${tableCounter2NF++}_2NF`;
-                        relations2NF.push({ name: newTableName, attributes: newTableAttrs });
-                        output += `<p>  - New Relation: ${newTableName}(${formatSet(newTableAttrs)})</p>`;
-                        determinantsProcessed.add(detKey);
+                 // Create new tables
+                 determinantsToTables.forEach(tableData => {
+                     const newTableAttrs = setUnion(tableData.determinant, tableData.dependents);
+                      // Check if already added (e.g., from decomposing another relation)
+                      let foundExisting = relations2NF.some(r => setsAreEqual(r.attributes, newTableAttrs));
+                     if (!foundExisting) {
+                         const newTableName = `R${tableCounter2NF++}_2NF`;
+                         relations2NF.push({ name: newTableName, attributes: newTableAttrs });
+                         output += `<p>  - New Relation: ${newTableName}(${formatSet(newTableAttrs)})</p>`;
                      }
                  });
 
-
-                 // Create the remaining relation (original attributes minus the moved non-primes)
+                 // Create the remaining relation
                  const remainingAttributes = setDifference(attributesInOriginal, attributesToRemove);
-                 // Ensure the original candidate key is fully present in the remaining part for lossless join
-                 // If parts of the key were non-prime (which shouldn't happen if key finding is right),
-                 // or if the only non-primes removed were key parts (error state), adding key back is safe.
-                 candidateKey.forEach(k => remainingAttributes.add(k));
+                 // Add back *at least one* full candidate key to ensure lossless join.
+                 // If multiple CKs, just adding one is sufficient theory-wise. Add the first one found.
+                 if(candidateKeys.length > 0) {
+                    candidateKeys[0].forEach(k => remainingAttributes.add(k));
+                 }
 
-
-                 // Add the remaining relation if it's distinct and meaningful
-                 if (remainingAttributes.size > 0 && !setsAreEqual(remainingAttributes, currentRel.attributes)) {
-                    let foundExisting = relations2NF.some(r => setsAreEqual(r.attributes, remainingAttributes));
-                    if (!foundExisting) {
-                        const remainingTableName = `${currentRel.name}_Rem`;
-                        relations2NF.push({ name: remainingTableName, attributes: remainingAttributes });
-                        output += `<p>  - Remaining Relation: ${remainingTableName}(${formatSet(remainingAttributes)})</p>`;
-                    }
-                 } else if (remainingAttributes.size === currentRel.attributes.size) {
-                    // This means nothing was actually removed, maybe due to how FDs interacted
-                     output += `<p class='error'>Internal Check: No attributes removed for 2NF decomposition of ${currentRel.name}. Keeping original.</p>`;
-                     relations2NF.push(currentRel); // Add original back
-                 } else {
+                  if (remainingAttributes.size > 0) {
+                     let foundExisting = relations2NF.some(r => setsAreEqual(r.attributes, remainingAttributes));
+                      if (!foundExisting && !setsAreEqual(remainingAttributes, currentRel.attributes)) { // Avoid adding identical or duplicate
+                         const remainingTableName = `${currentRel.name}_Rem`;
+                         relations2NF.push({ name: remainingTableName, attributes: remainingAttributes });
+                         output += `<p>  - Remaining Relation: ${remainingTableName}(${formatSet(remainingAttributes)})</p>`;
+                      } else if (setsAreEqual(remainingAttributes, currentRel.attributes)) {
+                          output += `<p class='error'>Internal Check: No attributes removed for 2NF decomposition of ${currentRel.name}. Keeping original.</p>`;
+                          if (!foundExisting) relations2NF.push(currentRel); // Add original only if not already effectively present
+                      }
+                  } else {
                       output += `<p>  - Original relation ${currentRel.name} potentially fully decomposed.</p>`;
                  }
 
@@ -319,9 +422,9 @@ document.addEventListener('DOMContentLoaded', () => {
         output += "\n---\n";
 
 
-        // --- 3NF ---
+        // --- 3NF (Modified Logic) ---
         output += "<h2>Step 3: Third Normal Form (3NF)</h2>\n";
-        output += "<p class='step-explanation'>Requires 2NF and no transitive dependencies (non-prime attributes depending on other non-prime attributes). An FD X → A violates 3NF if X is not a superkey and A is not prime.</p>";
+        output += "<p class='step-explanation'>Requires 2NF and no transitive dependencies. An FD X → A violates 3NF if X is not a superkey and A is not a prime attribute (i.e., A is not part of *any* candidate key).</p>";
 
         let relations3NF = [];
         let decomposedIn3NF = false;
@@ -339,20 +442,25 @@ document.addEventListener('DOMContentLoaded', () => {
                  continue;
              }
 
-            const candidateKey = findCandidateKey(currentRel.attributes, fds);
-             if (!candidateKey || candidateKey.size === 0) {
-                 output += `<p class='error'>Cannot determine Candidate Key for ${currentRel.name}. Skipping 3NF check.</p>`;
-                 relations3NF.push(currentRel);
-                 continue;
-             }
-             output += `<p>Using Candidate Key: ${formatSet(candidateKey)}</p>`;
-             // Simplification: Prime attributes are just those in *this* candidate key. Full 3NF needs all candidate keys.
-             const primeAttributes = new Set(candidateKey);
-             const nonPrimeAttributes = setDifference(currentRel.attributes, primeAttributes);
-             output += `<p>Prime Attributes (for this key): ${formatSet(primeAttributes)}</p>`;
+            // **MODIFICATION: Find ALL candidate keys for this relation**
+            const candidateKeys = findAllCandidateKeys(currentRel.attributes, fds);
+
+            if (candidateKeys.length === 0) {
+                output += `<p class='error'>Cannot determine Candidate Keys for ${currentRel.name}. Skipping 3NF check.</p>`;
+                relations3NF.push(currentRel);
+                continue;
+            }
+            output += `<p>Found Candidate Keys: ${candidateKeys.map(ck => `<code>${formatSet(ck)}</code>`).join(', ')}</p>`;
+
+            // **MODIFICATION: Determine ALL prime attributes**
+            const allPrimeAttributes = new Set();
+            candidateKeys.forEach(ck => ck.forEach(attr => allPrimeAttributes.add(attr)));
+            output += `<p>All Prime Attributes: ${formatSet(allPrimeAttributes)}</p>`;
+
+            const nonPrimeAttributes = setDifference(currentRel.attributes, allPrimeAttributes);
              output += `<p>Non-Prime Attributes: ${formatSet(nonPrimeAttributes)}</p>`;
               if (nonPrimeAttributes.size === 0) {
-                 output += `<p class='success'>No non-prime attributes. Relation is in 3NF.</p>`;
+                 output += `<p class='success'>No non-prime attributes. Relation is already in 3NF.</p>`;
                  relations3NF.push(currentRel);
                  continue;
              }
@@ -363,26 +471,25 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const fd of fds) {
                 const determinant = fd.determinant;
 
-                // Ensure FD is relevant (determinant and *some* dependent are within the relation)
                 if (setIsSubset(determinant, currentRel.attributes)) {
                     const relevantDependents = setIntersection(fd.dependent, currentRel.attributes);
 
                     if (relevantDependents.size > 0) {
-                        // Check condition for each dependent attribute A individually
+                        // Check violation for each dependent attribute A individually
                         for (const attrA of relevantDependents) {
-                             // Ensure A is not part of the determinant (non-trivial part of FD)
-                            if (!determinant.has(attrA)) {
+                            if (!determinant.has(attrA)) { // Ensure non-trivial part
                                 const singletonA = new Set([attrA]);
 
-                                // Check 3NF violation conditions:
+                                // **MODIFIED Check:**
                                 // 1. X is NOT a superkey of the relation
                                 const isXSuperkey = isSuperkey(determinant, currentRel.attributes, fds);
-                                // 2. A is NOT a prime attribute
-                                const isAPrime = primeAttributes.has(attrA);
+                                // 2. A is NOT a prime attribute (using allPrimeAttributes)
+                                const isAPrime = allPrimeAttributes.has(attrA);
 
                                 if (!isXSuperkey && !isAPrime) {
                                     output += `<p>Transitive Dependency: <code>${formatSet(determinant)} → ${formatSet(singletonA)}</code> violates 3NF in ${currentRel.name} (X not superkey, A not prime).</p>`;
-                                    transitiveDependenciesFound.push({ determinant, dependent: singletonA });
+                                    // Group by determinant for decomposition later
+                                     transitiveDependenciesFound.push({ determinant: determinant, dependent: singletonA });
                                     attributesToRemove.add(attrA);
                                     decomposedIn3NF = true;
                                 }
@@ -393,45 +500,54 @@ document.addEventListener('DOMContentLoaded', () => {
             } // End FD check loop
 
 
-            if (transitiveDependenciesFound.length > 0) {
+            if (decomposedIn3NF) { // Use flag
                 output += `<p class='success'>Decomposing ${currentRel.name} due to transitive dependencies:</p>`;
 
-                 // Create new relations: one for each violating FD (X -> A becomes relation R(X, A))
-                 const determinantsProcessed = new Set();
+                // Group violations by determinant
+                const determinantsToTables = new Map(); // Map<string_key, {determinant: Set, dependents: Set}>
                  transitiveDependenciesFound.forEach(td => {
-                    const newTableAttrs = setUnion(td.determinant, td.dependent);
-                    const tableKey = [...newTableAttrs].sort().join(','); // Key for uniqueness check
+                     const detKey = [...td.determinant].sort().join(',');
+                     if (!determinantsToTables.has(detKey)) {
+                         determinantsToTables.set(detKey, { determinant: td.determinant, dependents: new Set() });
+                     }
+                     // Add the single dependent attribute from td.dependent
+                      td.dependent.forEach(dep => determinantsToTables.get(detKey).dependents.add(dep));
+                 });
 
-                    // Avoid creating duplicate tables if multiple FDs lead to the same schema
-                    let foundExisting = relations3NF.some(r => setsAreEqual(r.attributes, newTableAttrs));
-                    if (!foundExisting && !determinantsProcessed.has(tableKey)) {
+                 // Create new tables R(X, A) for each group
+                  determinantsToTables.forEach(tableData => {
+                     const newTableAttrs = setUnion(tableData.determinant, tableData.dependents);
+                      let foundExisting = relations3NF.some(r => setsAreEqual(r.attributes, newTableAttrs));
+                     if (!foundExisting) {
                         const newTableName = `R${tableCounter3NF++}_3NF`;
                         relations3NF.push({ name: newTableName, attributes: newTableAttrs });
                         output += `<p>  - New Relation: ${newTableName}(${formatSet(newTableAttrs)})</p>`;
-                        determinantsProcessed.add(tableKey);
-                    }
+                     }
                  });
 
-                // Create the remaining relation: Original attributes MINUS the transitively dependent non-primes (attributesToRemove)
+
+                // Create the remaining relation: Original MINUS removed non-primes
                 const remainingAttributes = setDifference(currentRel.attributes, attributesToRemove);
-                // Ensure the key is still fully contained (it should be, as key parts or superkeys weren't removed)
-                // candidateKey.forEach(k => remainingAttributes.add(k)); // Usually redundant but safe
-
-
-                 // Add the remaining relation if it's meaningful and not duplicated
-                if (remainingAttributes.size > 0 && !setsAreEqual(remainingAttributes, currentRel.attributes)) {
-                     let foundExisting = relations3NF.some(r => setsAreEqual(r.attributes, remainingAttributes));
-                    if (!foundExisting) {
-                        const remainingTableName = `${currentRel.name}_Rem`;
-                        relations3NF.push({ name: remainingTableName, attributes: remainingAttributes });
-                        output += `<p>  - Remaining Relation: ${remainingTableName}(${formatSet(remainingAttributes)})</p>`;
-                    }
-                } else if (setsAreEqual(remainingAttributes, currentRel.attributes)){
-                     output += `<p class='error'>Internal Check: No attributes removed for 3NF decomposition of ${currentRel.name}. Keeping original.</p>`;
-                     relations3NF.push(currentRel); // Add original back
-                } else {
-                     output += `<p>  - Original relation ${currentRel.name} potentially fully decomposed.</p>`;
+                // Add back a candidate key if it's not fully contained (should usually be contained)
+                if(candidateKeys.length > 0 && !setIsSubset(candidateKeys[0], remainingAttributes)) {
+                   candidateKeys[0].forEach(k => remainingAttributes.add(k));
+                   output += `<p>  - (Ensured key ${formatSet(candidateKeys[0])} is in remaining relation)</p>`
                 }
+
+
+                 if (remainingAttributes.size > 0) {
+                     let foundExisting = relations3NF.some(r => setsAreEqual(r.attributes, remainingAttributes));
+                     if (!foundExisting && !setsAreEqual(remainingAttributes, currentRel.attributes)) {
+                         const remainingTableName = `${currentRel.name}_Rem`;
+                         relations3NF.push({ name: remainingTableName, attributes: remainingAttributes });
+                         output += `<p>  - Remaining Relation: ${remainingTableName}(${formatSet(remainingAttributes)})</p>`;
+                     } else if (setsAreEqual(remainingAttributes, currentRel.attributes)){
+                         output += `<p class='error'>Internal Check: No attributes removed for 3NF decomposition of ${currentRel.name}. Keeping original.</p>`;
+                          if (!foundExisting) relations3NF.push(currentRel);
+                     }
+                 } else {
+                     output += `<p>  - Original relation ${currentRel.name} potentially fully decomposed.</p>`;
+                 }
 
             } else {
                 output += `<p class='success'>No transitive dependencies found. Relation ${currentRel.name} is already in 3NF.</p>`;
@@ -452,17 +568,14 @@ document.addEventListener('DOMContentLoaded', () => {
         output += "\n---\n";
 
 
-        // --- BCNF ---
+        // --- BCNF (Logic mostly unchanged, relies on isSuperkey) ---
         output += "<h2>Step 4: Boyce-Codd Normal Form (BCNF)</h2>\n";
-        output += "<p class='step-explanation'>Requires 3NF. For every non-trivial FD X → Y that holds, X must be a superkey. BCNF is stricter and decomposition might lose dependencies.</p>";
+        output += "<p class='step-explanation'>Requires 3NF. For every non-trivial FD X → Y that holds, X must be a superkey. Decomposition might lose dependencies.</p>";
 
-        let relationsBCNF_final = []; // Store relations confirmed to be in BCNF
-        let decompositionOccurred = false; // Track if any BCNF decomp happened at all
-        let relationsToProcessBCNF = [...currentRelations]; // Start with 3NF results
+        let relationsBCNF_final = [];
+        let decompositionOccurredBCNF = false; // Renamed flag
+        let relationsToProcessBCNF = [...currentRelations];
         let tableCounterBCNF = 1;
-
-
-        // Use a queue-like approach: check each relation, if violates, decompose and add new ones back to check
         let processingQueue = [...relationsToProcessBCNF];
 
         while (processingQueue.length > 0) {
@@ -472,75 +585,59 @@ document.addEventListener('DOMContentLoaded', () => {
              let violationFound = false;
              let violatingFD = null; // { determinant: Set, dependent: Set }
 
-             // Check all original FDs against the current relation
-             for (const fd of fds) {
+             for (const fd of fds) { // Check against original FDs
                  const determinant = fd.determinant;
                  const dependent = fd.dependent;
 
-                 // Is the FD applicable to this relation? (Determinant and Dependent are subsets)
                  if (setIsSubset(determinant, currentRel.attributes) && setIsSubset(dependent, currentRel.attributes)) {
-                      // Is the FD non-trivial *within this relation*? (Dependent has attributes not in Determinant)
                      const relevantDependent = setDifference(dependent, determinant);
                      const relevantDependentInRelation = setIntersection(relevantDependent, currentRel.attributes);
 
                      if (relevantDependentInRelation.size > 0) {
-                         // Check BCNF condition: Is the determinant a superkey of *this* relation?
                          const isXSuperkey = isSuperkey(determinant, currentRel.attributes, fds);
 
                          if (!isXSuperkey) {
                              output += `<p>BCNF Violation: <code>${formatSet(determinant)} → ${formatSet(relevantDependentInRelation)}</code> holds in ${currentRel.name}, but ${formatSet(determinant)} is not a superkey.</p>`;
                              violationFound = true;
-                             violatingFD = { determinant, dependent: relevantDependentInRelation }; // Use the relevant dependent part
-                             decompositionOccurred = true;
-                             break; // Found a violation, decompose based on this one
+                             violatingFD = { determinant, dependent: relevantDependentInRelation };
+                             decompositionOccurredBCNF = true;
+                             break; // Decompose based on this violation
                          }
                      }
                  }
-             } // End loop checking FDs for currentRel
-
+             } // End loop checking FDs
 
              if (violationFound) {
                  output += `<p class='success'>Decomposing ${currentRel.name} based on the violation:</p>`;
-
-                 // Decompose R into R1(X U Y) and R2(X U (R - (X U Y)))
-                 // R1 = Determinant U RelevantDependent
                  const attrsR1 = setUnion(violatingFD.determinant, violatingFD.dependent);
-                 // R2 = Determinant U (Attributes of R minus Attributes of R1)
                  const attrsR2 = setUnion(violatingFD.determinant, setDifference(currentRel.attributes, attrsR1));
 
-                 // Add the new relations back to the queue for checking
                  const nameR1 = `R${tableCounterBCNF++}_BCNF`;
                  const relationR1 = { name: nameR1, attributes: attrsR1 };
                  output += `<p>  - New Relation 1: ${nameR1}(${formatSet(attrsR1)})</p>`;
-                 processingQueue.push(relationR1); // Add back to check
+                 processingQueue.push(relationR1);
 
-                 // Only add R2 if it has attributes and is different from R1
                  if (attrsR2.size > 0 && !setsAreEqual(attrsR1, attrsR2)) {
                     const nameR2 = `R${tableCounterBCNF++}_BCNF`;
                      const relationR2 = { name: nameR2, attributes: attrsR2 };
                      output += `<p>  - New Relation 2: ${nameR2}(${formatSet(attrsR2)})</p>`;
-                     processingQueue.push(relationR2); // Add back to check
+                     processingQueue.push(relationR2);
                  } else {
-                     output += `<p>  - Second relation from decomposition was empty or identical, discarded.</p>`;
+                    output += `<p>  - Second relation from decomposition was empty or identical, discarded.</p>`;
                  }
-
              } else {
                   output += `<p class='success'>No BCNF violations found. Relation ${currentRel.name} is in BCNF.</p>`;
-                  // This relation is confirmed BCNF, add to final list
                   relationsBCNF_final.push(currentRel);
              }
-
         } // End while processingQueue
 
-
-        if (!decompositionOccurred) {
+        if (!decompositionOccurredBCNF) {
             output += `<p class='success'>All relations were already in BCNF.</p>\n`;
         } else {
              output += `<p class='success'>Decomposition for BCNF complete.</p>\n`;
              output += "<p class='step-explanation'>(Note: Some original functional dependencies might no longer be preserved across these BCNF relations).</p>";
-
         }
-        currentRelations = relationsBCNF_final; // Final result
+        currentRelations = relationsBCNF_final;
         output += "\nResulting Relations after BCNF:\n";
         if (currentRelations.length === 0) output += "  (None - check decomposition steps)\n";
         currentRelations.forEach(r => output += `  - ${r.name}(${formatSet(r.attributes)})\n`);
@@ -550,102 +647,66 @@ document.addEventListener('DOMContentLoaded', () => {
     } // End of normalize function
 
 
-    // --- UI Interaction Functions ---
-
-    /** Adds a new, empty table definition block to the UI */
+    // --- UI Interaction Functions --- (addTable, addColumn, addFdRow - Same as before)
     function addTable() {
         const tableClone = tableTemplate.content.cloneNode(true);
         tablesContainer.appendChild(tableClone);
-        // Focus the new table's name input (optional)
         tablesContainer.lastElementChild?.querySelector('.table-name')?.focus();
     }
-
-    /** Adds a column entry to a specific table's column container */
     function addColumn(addColumnButton) {
         const tableDefinition = addColumnButton.closest('.table-definition');
         const input = tableDefinition.querySelector('.new-column-input');
         const columnName = input.value.trim();
         const columnsContainer = tableDefinition.querySelector('.columns-container');
-
         if (columnName) {
-            // Check for duplicates *within this table*
              const existingColumns = columnsContainer.querySelectorAll('.column-name');
              for(let colSpan of existingColumns) {
                  if (colSpan.textContent === columnName) {
                      alert(`Attribute "${columnName}" already exists in this table.`);
-                     input.focus();
-                     input.select();
-                     return; // Don't add duplicate
+                     input.focus(); input.select(); return;
                  }
              }
-
             const columnClone = columnTemplate.content.cloneNode(true);
             columnClone.querySelector('.column-name').textContent = columnName;
             columnsContainer.appendChild(columnClone);
-            input.value = ''; // Clear input
-            input.focus(); // Ready for next column
+            input.value = ''; input.focus();
         } else {
-            alert("Please enter an attribute name.");
-            input.focus();
+            alert("Please enter an attribute name."); input.focus();
         }
     }
-
-     /** Adds a new, empty FD entry row to the UI */
      function addFdRow() {
          const fdClone = fdTemplate.content.cloneNode(true);
          fdsListContainer.appendChild(fdClone);
-         // Focus the new determinant input (optional)
          fdsListContainer.lastElementChild?.querySelector('.fd-determinant')?.focus();
      }
 
 
-    // --- Event Listeners ---
-
+    // --- Event Listeners --- (Same as before)
     addTableBtn.addEventListener('click', addTable);
     addFdBtn.addEventListener('click', addFdRow);
-
-    // Use event delegation for dynamically added elements
     tablesContainer.addEventListener('click', (event) => {
-        // Handle adding a column
-        if (event.target.classList.contains('add-column-btn')) {
-            addColumn(event.target);
-        }
-        // Handle removing a column
-        else if (event.target.classList.contains('remove-column-btn')) {
-            event.target.closest('.column-entry').remove();
-        }
-        // Handle removing a table
+        if (event.target.classList.contains('add-column-btn')) addColumn(event.target);
+        else if (event.target.classList.contains('remove-column-btn')) event.target.closest('.column-entry').remove();
         else if (event.target.classList.contains('remove-table-btn')) {
-            if (confirm("Are you sure you want to remove this entire table and its columns?")) {
-                event.target.closest('.table-definition').remove();
-            }
+            if (confirm("Remove this table?")) event.target.closest('.table-definition').remove();
         }
     });
-
-    // Use event delegation for removing FDs
      fdsListContainer.addEventListener('click', (event) => {
-         if (event.target.classList.contains('remove-fd-btn')) {
-              event.target.closest('.fd-entry').remove();
-         }
+         if (event.target.classList.contains('remove-fd-btn')) event.target.closest('.fd-entry').remove();
      });
-
-    // Handle Enter key press in "new column" input to add column
     tablesContainer.addEventListener('keypress', (event) => {
         if (event.key === 'Enter' && event.target.classList.contains('new-column-input')) {
-             event.preventDefault(); // Prevent form submission if inside form
-             const addButton = event.target.nextElementSibling; // Find the sibling button
-             if(addButton && addButton.classList.contains('add-column-btn')) {
-                 addColumn(addButton);
-             }
+             event.preventDefault();
+             const addButton = event.target.nextElementSibling;
+             if(addButton && addButton.classList.contains('add-column-btn')) addColumn(addButton);
         }
     });
 
-
-    // Main Normalize Button Handler
+    // --- Normalize Button Handler --- (Same basic flow, uses updated normalize)
     normalizeBtn.addEventListener('click', () => {
         resultsDiv.innerHTML = "<p>Processing...</p>";
 
-        // 1. Collect ALL unique attributes from all tables
+        // 1. Collect Attributes (Same as before)
         const allAttributes = new Set();
         const columnSpans = tablesContainer.querySelectorAll('.column-name');
         if (columnSpans.length === 0) {
@@ -654,53 +715,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         columnSpans.forEach(span => {
             const attrName = span.textContent.trim();
-            if (attrName) { // Avoid adding empty strings if somehow created
-                allAttributes.add(attrName);
-            }
+            if (attrName) allAttributes.add(attrName);
         });
-
-        if (allAttributes.size === 0) {
-             resultsDiv.innerHTML = "<p class='error'>Schema Error: No valid attribute names found in the tables.</p>";
+         if (allAttributes.size === 0) {
+             resultsDiv.innerHTML = "<p class='error'>Schema Error: No valid attribute names found.</p>";
             return;
         }
 
-        // 2. Parse Functional Dependencies from the UI
+        // 2. Parse FDs (Same as before)
         const { fds, error: fdError } = parseFDsFromUI();
-
         if (fdError) {
-            resultsDiv.innerHTML = `<p class='error'>FD Error: ${fdError}</p>`;
-            return;
+            resultsDiv.innerHTML = `<p class='error'>FD Error: ${fdError}</p>`; return;
         }
 
-        // (Optional but recommended) Check if all attributes used in FDs are defined in the tables
+        // 3. Check FD Attributes Exist (Same as before)
          let unknownAttrs = new Set();
          fds.forEach(fd => {
              fd.determinant.forEach(attr => { if (!allAttributes.has(attr)) unknownAttrs.add(attr); });
              fd.dependent.forEach(attr => { if (!allAttributes.has(attr)) unknownAttrs.add(attr); });
          });
-
          if (unknownAttrs.size > 0) {
-              resultsDiv.innerHTML = `<p class='error'>FD Error: The following attributes used in FDs are not defined in any table columns: <code>${formatSet(unknownAttrs)}</code></p>`;
+              resultsDiv.innerHTML = `<p class='error'>FD Error: Attributes used in FDs not defined in tables: <code>${formatSet(unknownAttrs)}</code></p>`;
              return;
          }
 
-
-        // 3. Perform Normalization (using the core logic functions)
+        // 4. Perform Normalization (Calls updated `normalize`)
         try {
-            // Add small delay to allow "Processing..." message to render reliably
-            setTimeout(() => {
+            setTimeout(() => { // Small delay for UI update
                 const normalizationOutput = normalize(allAttributes, fds);
-                resultsDiv.innerHTML = normalizationOutput; // Display results
-            }, 50); // 50ms delay
-
+                resultsDiv.innerHTML = normalizationOutput;
+            }, 50);
         } catch (e) {
             console.error("Normalization Error:", e);
-            resultsDiv.innerHTML = `<p class='error'>An unexpected error occurred during normalization. Check the browser console for details. Error: ${e.message}</p>`;
+            resultsDiv.innerHTML = `<p class='error'>An unexpected error occurred: ${e.message}. Check console.</p>`;
         }
     });
 
-    // --- Initial State ---
-    addTable(); // Start with one empty table definition
-    addFdRow(); // Start with one empty FD row
+    // --- Initial State --- (Same as before)
+    addTable();
+    addFdRow();
 
 }); // End DOMContentLoaded
